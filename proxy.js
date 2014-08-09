@@ -79,7 +79,9 @@ https.globalAgent.maxSockets = 65535;
 
 var headerExcludes = {
     'host': true,
-    'range': true
+    'range': true,
+    'accept-encoding': true,
+    'content-encoding': true
 };
 
 function copyHeaders(src, dest) {
@@ -158,10 +160,9 @@ util.apply(GSession.prototype, {
 
     sendHeaders: function(response) {
         this.proxyContentType = response.headers['content-type'];
+        this.compressible = /(text|json)/.test(this.proxyContentType);
         var headers = copyHeaders(response.headers);
-        if (/(text|json)/.test(this.proxyContentType)) {
-            headers['Content-Encoding'] = 'deflate';
-        }
+        if (this.compressible) headers['Content-Encoding'] = 'deflate';
         this.res.writeHead(response.statusCode, headers);
     },
 
@@ -173,7 +174,7 @@ util.apply(GSession.prototype, {
                 content: this.body
             });
         }
-        if (/(text|json)/.test(this.proxyContentType)) {
+        if (this.compressible) {
             zlib.deflateRaw(this.body, function(err, buf) {
                 this.res.write(buf);
                 this.res.end();
