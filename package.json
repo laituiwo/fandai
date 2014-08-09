@@ -1,0 +1,8 @@
+{
+  "name": "simple-google-mirror",
+  "version": "0.5.0",
+  "description": "Simple Google search mirror.",
+  "main": "server.js",
+  "repository": "",
+  "author": "Spance <spance.wong@gmail.com>"
+}
