@@ -75,15 +75,15 @@ var rulesDefine = {
 
 var reCookieDomain = /;\s*domain=\.google[.\w]+/;
 
-https.globalAgent.maxSockets = 500;
+https.globalAgent.maxSockets = 65535;
 
 
 function copyHeaders(src, dest) {
     var _dest = dest || {};
     for (var key in src) {
-        if (key != 'host' && !key.startsWith('x-')) {
+        if (key != 'host' && !key.startsWith('x-')) { // 防止x-forwarded-*
             var val = src[key];
-            if (key === 'set-cookie') {
+            if (key === 'set-cookie') { // 处理cookie中的domain含有google.com
                 if (util.isArray(val)) {
                     for (var i = 0, len = val.length; i < len; i++) {
                         val[i] = val[i].replace(reCookieDomain, '');
@@ -136,8 +136,8 @@ function buildReuqest(req) {
 
 function log(msg, req) {
     var client = req ? ((trust_proxy && req.headers['x-forwarded-for']) || req.connection.remoteAddress) : '*';
-    if (msg.length > 80) {
-        msg = msg.substr(0, 77) + '...';
+    if (msg.length > 120) {
+        msg = msg.substr(0, 117) + '...';
     }
     util.log(client + ' - ' + msg);
 }
@@ -179,10 +179,9 @@ util.apply(GSession.prototype, {
             log(util.format('[%s] < %s', pxRes.statusCode, this.path), this.req);
             this.sendHeaders(pxRes);
             this.body = new Buffer(0);
-            pxRes.on('data', function(data) {
+            pxRes.on('end', this.sendBody.bind(this)).on('data', function(data) {
                 this.body = Buffer.concat([this.body, data]);
             }.bind(this));
-            pxRes.on('end', this.sendBody.bind(this));
         }.bind(this)).on('error', function(e) {
             res.writeHead(e.statusCode, e.message);
             res.end();
