@@ -77,11 +77,15 @@ var reCookieDomain = /;\s*domain=\.google[.\w]+/;
 
 https.globalAgent.maxSockets = 65535;
 
+var headerExcludes = {
+    'host': true,
+    'range': true
+};
 
 function copyHeaders(src, dest) {
     var _dest = dest || {};
     for (var key in src) {
-        if (key != 'host' && !key.startsWith('x-')) { // 防止x-forwarded-*
+        if (!headerExcludes[key] && !key.startsWith('x-')) { // 防止x-forwarded-*
             var val = src[key];
             if (key === 'set-cookie') { // 处理cookie中的domain含有google.com
                 if (util.isArray(val)) {
@@ -107,7 +111,7 @@ function processContent(obj) {
     } else if (contentType.contains('json')) {
         rules = rulesDefine.json;
     }
-    if (rules) {
+    if (rules && obj.content) {
         var str = obj.content.toString();
         for (var rule, i = 0, len = rules.length; i < len; i++) {
             rule = rules[i];
@@ -154,8 +158,10 @@ util.apply(GSession.prototype, {
 
     sendHeaders: function(response) {
         this.proxyContentType = response.headers['content-type'];
-        this.res.setHeader('Content-Encoding', 'deflate');
         var headers = copyHeaders(response.headers);
+        if (/(text|json)/.test(this.proxyContentType)) {
+            headers['Content-Encoding'] = 'deflate';
+        }
         this.res.writeHead(response.statusCode, headers);
     },
 
@@ -167,10 +173,15 @@ util.apply(GSession.prototype, {
                 content: this.body
             });
         }
-        zlib.deflateRaw(this.body, function(err, buf) {
-            this.res.write(buf);
+        if (/(text|json)/.test(this.proxyContentType)) {
+            zlib.deflateRaw(this.body, function(err, buf) {
+                this.res.write(buf);
+                this.res.end();
+            }.bind(this));
+        } else {
+            this.res.write(this.body || '');
             this.res.end();
-        }.bind(this));
+        }
     },
 
     doProxy: function(res) {
@@ -178,13 +189,13 @@ util.apply(GSession.prototype, {
         https.request(buildReuqest(this.req), function(pxRes) {
             log(util.format('[%s] < %s', pxRes.statusCode, this.path), this.req);
             this.sendHeaders(pxRes);
-            this.body = new Buffer(0);
-            pxRes.on('end', this.sendBody.bind(this)).on('data', function(data) {
-                this.body = Buffer.concat([this.body, data]);
+            pxRes.on('end', this.sendBody.bind(this));
+            pxRes.on('data', function(data) {
+                this.body = Buffer.concat([this.body || new Buffer(0), data]);
             }.bind(this));
         }.bind(this)).on('error', function(e) {
             res.writeHead(e.statusCode, e.message);
-            res.end();
+            res.end(e.message);
         }).end();
     }
 });
