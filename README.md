@@ -1,6 +1,8 @@
-# nThrough
+# AirGoogle
 
-Simple Google reverse proxy with improvement.
+Project name(**nThrough**) was renamed to AirGoogle.
+
+AirGoogle is a very handy Google search mirror, and includes a few improved features.
 
 - No second url redirect. So faster than usual.
 - No mobile banner.
@@ -9,4 +11,4 @@ Simple Google reverse proxy with improvement.
 ## Running the server
 
     $ node server.js
-    - Server running and listening at 4:0.0.0.0:8080
+    - Server running and listening at 0.0.0.0:8080

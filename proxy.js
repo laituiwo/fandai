@@ -1,4 +1,4 @@
-var https = require("https");
+var https = require("http");
 var util = require('util');
 var zlib = require('zlib');
 
@@ -45,50 +45,65 @@ var rulesDefine = {
         "pathRegex": /\/(search|webhp)/,
         "pattern": /onmousedown=\"[^\"]+?\"/g,
         "replacement": "target=\"_blank\""
-        /* 换掉 /search rwt */
+            /* 换掉 /search rwt */
+    }, {
+        "pathRegex": /\/(search|webhp)/,
+        "pattern": /onmousedown\\\\x3d\\\\x22.+?\\\\x22/g,
+        "replacement": "target\\\\x3d\\\\x22_blank\\\\x22"
     }, {
         "pattern": /,pushdown_promo:'[^']+?'/g,
         "replacement": ""
-        /* 滤掉广告 */
+            /* 滤掉手机顶部banner */
     }, {
         "pattern": /\/\/(?=ssl\.)/g,
         "replacement": "/!"
-        /* 重写绝对地址 */
+            /* 重写绝对地址 */
     }, {
         "pattern": /(\w+:)?\/\/www\.google[.\w]+/g,
         "replacement": ""
-        /* 重写绝对地址 */
+            /* 重写绝对地址 */
     }],
     js: [{
         "pattern": /(\w+:)?\/\/www\.google[.\w]+/g,
         "replacement": ""
-        /* 重写xjs,rs绝对地址 */
-    }],
-    json: [{
-        "pattern": /https:\\\/\\\/www\.google[.\w]+/g,
-        "replacement": ""
+            /* 重写xjs,rs绝对地址 */
     }, {
-        "pattern": /onmousedown\\\\x3d\\\\x22.+?\\\\x22/g,
-        "replacement": "target\\\\x3d\\\\x22_blank\\\\x22"
-    }]
+        "pattern": /MessageChannel;/g,
+        "replacement": "m;return;"
+            /* 禁用监听，去掉gen_204请求 */
+    }],
+    json: [
+        //     {
+        //     "pattern": /https:\\\/\\\/www\.google[.\w]+/g,
+        //     "replacement": ""
+        // }, 
+        {
+            "pattern": /onmousedown\\\\x3d\\\\x22.+?\\\\x22/g,
+            "replacement": "target\\\\x3d\\\\x22_blank\\\\x22"
+        }
+    ]
 };
 
-var reCookieDomain = /;\s*domain=\.google[.\w]+/;
+var reCookieDomain = /;\s*domain=[.\w]+/;
 
 https.globalAgent.maxSockets = 65535;
 
 var headerExcludes = {
     'host': true,
     'range': true,
+    'connection': true,
+    'content-length': true,
     'accept-encoding': true,
+    'transfer-encoding': true,
     'content-encoding': true
 };
 
 function copyHeaders(src, dest) {
-    var _dest = dest || {};
-    for (var key in src) {
+    var _dest = dest || {},
+        key, val;
+    for (key in src) {
         if (!headerExcludes[key] && !key.startsWith('x-')) { // 防止x-forwarded-*
-            var val = src[key];
+            val = src[key];
             if (key === 'set-cookie') { // 处理cookie中的domain含有google.com
                 if (util.isArray(val)) {
                     for (var i = 0, len = val.length; i < len; i++) {
@@ -101,28 +116,30 @@ function copyHeaders(src, dest) {
             _dest[key] = val;
         }
     }
-    if (!dest) return _dest;
+    return _dest;
 }
 
-function processContent(obj) {
-    var rules, contentType = obj.contentType || '';
+function processContent(path, contentType, content) {
+    var rules;
     if (contentType.contains('html')) {
         rules = rulesDefine.html;
-    } else if (contentType.contains('javas')) {
-        rules = rulesDefine.js;
     } else if (contentType.contains('json')) {
         rules = rulesDefine.json;
+    } else if (contentType.contains('javas')) {
+        rules = rulesDefine.js;
     }
-    if (rules && obj.content) {
-        var str = obj.content.toString();
+
+    if (rules && content) {
+        var str = content.toString();
         for (var rule, i = 0, len = rules.length; i < len; i++) {
             rule = rules[i];
-            if (rule.pathRegex && !rule.pathRegex.test(obj.path)) continue;
+            if (rule.pathRegex && !rule.pathRegex.test(path))
+                continue;
             str = str.replace(rule.pattern, rule.replacement);
         }
         return new Buffer(str);
     }
-    return obj.content;
+    return content;
 }
 
 function buildReuqest(req) {
@@ -131,20 +148,25 @@ function buildReuqest(req) {
             hostname: 'www.google.com',
             path: path
         };
+    if (options.path === '/') {
+        options.path = '/?hl=zh-CN&nord=1';
+    }
     if (path.startsWith('/!')) {
         var sp = path.indexOf('/', 1);
         options.hostname = path.substring(2, sp);
         options.path = path.substr(sp);
     }
-    options.headers = copyHeaders(req.headers);
+    options.headers = copyHeaders(req.headers, {
+        'Connection': 'keep-alive',
+        'Accept-Encoding': 'gzip'
+    });
     return options;
 }
 
 function log(msg, req) {
-    var client = req ? ((trust_proxy && req.headers['x-forwarded-for']) || req.connection.remoteAddress) : '*';
-    if (msg.length > 120) {
-        msg = msg.substr(0, 117) + '...';
-    }
+    var client = req ? ((trust_proxy && req.headers['x-forwarded-for']) || req.connection.remoteAddress) : '-.-.-.-';
+    if (msg.length > 120)
+        msg = msg.substr(0, 120);
     util.log(client + ' - ' + msg);
 }
 
@@ -158,44 +180,55 @@ function GSession(req) {
 
 util.apply(GSession.prototype, {
 
-    sendHeaders: function(response) {
+    prepare: function(response) {
+        this.proxyStatusCode = response.statusCode;
         this.proxyContentType = response.headers['content-type'];
+        this.proxyContentEncoding = response.headers['content-encoding'];
         this.compressible = /(text|json)/.test(this.proxyContentType);
-        var headers = copyHeaders(response.headers);
-        if (this.compressible) headers['Content-Encoding'] = 'deflate';
-        this.res.writeHead(response.statusCode, headers);
+        this.resHeaders = copyHeaders(response.headers);
+        log(util.format('[%s] < %s', response.statusCode, this.path), this.req);
     },
 
-    sendBody: function() {
-        if (this.proxyContentType) {
-            this.body = processContent({
-                path: this.path,
-                contentType: this.proxyContentType,
-                content: this.body
-            });
+    sendHeader: function(len, zipped) {
+        if (zipped) {
+            this.resHeaders['Content-Encoding'] = 'gzip';
         }
-        if (this.compressible) {
-            zlib.deflateRaw(this.body, function(err, buf) {
-                this.res.write(buf);
-                this.res.end();
+        this.resHeaders['Content-Length'] = len;
+        this.res.writeHead(this.proxyStatusCode, this.resHeaders);
+    },
+
+    send: function(err, body) {
+        if (this.proxyContentType) {
+            body = processContent(this.path, this.proxyContentType, body);
+        }
+        if (this.compressible && body.length > 0) { // 可压缩且有数据
+            zlib.gzip(body, function(err, buf) {
+                this.sendHeader(buf.length, true);
+                this.res.end(buf);
             }.bind(this));
         } else {
-            this.res.write(this.body || '');
-            this.res.end();
+            this.sendHeader(body.length);
+            this.res.end(body);
         }
     },
 
     doProxy: function(res) {
         this.res = res;
+        var that = this;
         https.request(buildReuqest(this.req), function(pxRes) {
-            log(util.format('[%s] < %s', pxRes.statusCode, this.path), this.req);
-            this.sendHeaders(pxRes);
-            pxRes.on('end', this.sendBody.bind(this));
+            that.prepare(pxRes);
+            var body = new Buffer(0);
+            pxRes.on('end', function() {
+                if (that.proxyContentEncoding === 'gzip')
+                    zlib.gunzip(body, that.send.bind(that));
+                else
+                    that.send(null, body);
+            });
             pxRes.on('data', function(data) {
-                this.body = Buffer.concat([this.body || new Buffer(0), data]);
-            }.bind(this));
-        }.bind(this)).on('error', function(e) {
-            res.writeHead(e.statusCode, e.message);
+                body = Buffer.concat([body, data]);
+            });
+        }).on('error', function(e) {
+            res.writeHead(e.statusCode);
             res.end(e.message);
         }).end();
     }
@@ -203,5 +236,17 @@ util.apply(GSession.prototype, {
 
 
 module.exports = function(req, res) {
-    new GSession(req).doProxy(res);
+    var proto = req.headers['x-forwarded-proto'];
+    if (proto === 'https') {
+        if (req.url.startsWith('/gen_')) {
+            res.writeHead(204);
+            res.end();
+        } else
+            new GSession(req).doProxy(res);
+    } else {
+        res.writeHead(301, {
+            'Location': 'https://' + req.headers['host'] + req.url
+        });
+        res.end();
+    }
 };
