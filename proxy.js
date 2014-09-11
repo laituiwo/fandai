@@ -1,91 +1,12 @@
-var https = require("http");
-var util = require('util');
-var zlib = require('zlib');
+var config = require('./config');
+var conf = config.sysconf;
+var zlib = require('zlib'),
+    util = require('util'),
+    https = require(conf.backend_https ? 'https' : 'http');
 
-util.apply = function (o, c, defaults) {
-	if (defaults) {
-		util.apply(o, defaults);
-	}
-	if (o && c && typeof c == 'object') {
-		for (var p in c) {
-			o[p] = c[p];
-		}
-	}
-	return o;
-};
+var trust_proxy = conf.trust_proxy;
 
-util.apply(String.prototype, {
-	contains : function (str) {
-		return str && this.indexOf(str) > -1;
-	},
-	startsWith : function (prefix) {
-		return prefix && this.length >= prefix.length && this.substring(0, prefix.length) === prefix;
-	},
-	endsWith : function (suffix) {
-		return suffix && this.length >= suffix.length && this.slice(-suffix.length) === suffix;
-	},
-	hashCode : function () {
-		if (this.length === 0)
-			return 0;
-		var hash = 0,
-		charAt,
-		i,
-		len = this.length;
-		for (i = 0; i < len; i++) {
-			charAt = this.charCodeAt(i);
-			hash = ((hash << 5) - hash) + charAt;
-			hash = hash & hash; // Convert to 32bit integer
-		}
-		return hash;
-	}
-});
-
-var trust_proxy = process.env.trust_proxy === false ? false : true;
-
-var rulesDefine = {
-	html : [{
-			"pathRegex" : /\/(search|webhp)/,
-			"pattern" : /onmousedown=\"[^\"]+?\"/g,
-			"replacement" : "target=\"_blank\""
-			/* 换掉 /search rwt */
-		}, {
-			"pathRegex" : /\/(search|webhp)/,
-			"pattern" : /onmousedown\\\\x3d\\\\x22.+?\\\\x22/g,
-			"replacement" : "target\\\\x3d\\\\x22_blank\\\\x22"
-		}, {
-			"pattern" : /,pushdown_promo:'[^']+?'/g,
-			"replacement" : ""
-			/* 滤掉手机顶部banner */
-		}, {
-			"pattern" : /\/\/(?=ssl\.)/g,
-			"replacement" : "/!"
-			/* 重写绝对地址 */
-		}, {
-			"pattern" : /([htps]+:)?\/\/www\.google\.com/g,
-			"replacement" : ""
-			/* 重写绝对地址 */
-		}, {
-			"pattern" : /google\.log=/,
-			"replacement" : "google.log=function(){};_log="
-			/* 禁用log，去掉gen_204请求 */
-		}
-	],
-	js : [{
-			"pattern" : /([htps]+:)?\/\/www\.google\.com/g,
-			"replacement" : ""
-			/* 重写xjs,rs绝对地址 */
-		}, {
-			"pattern" : /_\.mg=/,
-			"replacement" : "_.mg=function(){};_mg="
-			/* 禁用监听，去掉gen_204请求 */
-		}
-	],
-	json : [{
-			"pattern" : /onmousedown\\\\x3d\\\\x22.+?\\\\x22/g,
-			"replacement" : "target\\\\x3d\\\\x22_blank\\\\x22"
-		}
-	]
-};
+var rulesDefine = config.rules;
 
 var reCookieDomain = /domain=[.\w]+/;
 
@@ -95,7 +16,6 @@ var headerExcludes = {
 	'host' : true,
 	'range' : true,
 	'connection' : true,
-	'content-length' : true,
 	'accept-encoding' : true,
 	'transfer-encoding' : true,
 	'content-encoding' : true,
@@ -103,7 +23,9 @@ var headerExcludes = {
 };
 
 function copyHeaders(src, dest, host) {
-	var key, val, _dest = dest || {};
+	var key,
+	val,
+	_dest = dest || {};
 	for (key in src) {
 		if (!headerExcludes[key] && !key.startsWith('x-')) { // 防止x-forwarded-*
 			val = src[key];
@@ -114,6 +36,8 @@ function copyHeaders(src, dest, host) {
 				for (var i = 0, len = val.length; i < len; i++)
 					val[i] = val[i].replace(reCookieDomain, 'domain=.' + host);
 			}
+			if (key === 'cookie' && !host)
+				continue;
 			_dest[key] = val;
 		}
 	}
@@ -129,7 +53,6 @@ function processContent(path, contentType, content) {
 	} else if (contentType.contains('javas')) {
 		rules = rulesDefine.js;
 	}
-
 	if (rules && content) {
 		var str = content.toString();
 		for (var rule, i = 0, len = rules.length; i < len; i++) {
@@ -149,7 +72,6 @@ function buildReuqest(req) {
 		hostname : 'www.google.com',
 		path : path
 	};
-
 	if (path.startsWith('/!')) {
 		var sp = path.indexOf('/', 1);
 		options.hostname = path.substring(2, sp);
@@ -173,81 +95,102 @@ function log(msg, req) {
 /**
  * 请求会话
  */
-function GSession(req) {
-	this.req = req;
-	this.path = req.url;
+function GSession(r1) {
+	this.r1 = r1;
+	this.path = r1.url;
 }
 
-util.apply(GSession.prototype, {
+apply(GSession.prototype, {
 
 	prepare : function (response) {
-		this.proxyStatusCode = response.statusCode;
-		this.proxyContentType = response.headers['content-type'];
-		this.proxyContentEncoding = response.headers['content-encoding'];
-		this.compressible = /(text|json)/.test(this.proxyContentType);
-		this.resHeaders = copyHeaders(response.headers, {}, this.req_opts.extra ? null : this.req.headers['host']);
-		log(util.format('[%s] < %s', response.statusCode, this.path), this.req);
+		this.r3_statusCode = response.statusCode;
+		this.r3_contentType = response.headers['content-type'];
+		this.r3_contentEncoding = response.headers['content-encoding'];
+		this.compressible = /(text|json)/.test(this.r3_contentType);
+		this.cacheable = !/(html|json)/.test(this.r3_contentType);
+		this.r4_headers = copyHeaders(response.headers, {}, this.r2_opts.extra ? null : this.r1.headers['host']);
+		if (conf.logging)
+			log(util.format('[%s] < %s', response.statusCode, this.path), this.r1);
 	},
 
 	sendHeader : function (len, zipped) {
-		if (zipped) {
-			this.resHeaders['Content-Encoding'] = 'gzip';
+		if (this.cacheable && conf.force_cached_time > 0) {
+			var cacheControl = this.r4_headers['cache-control'];
+			if (!cacheControl || !cacheControl.startsWith('public'))
+				this.r4_headers['cache-control'] = 'public';
+			var expires = this.r4_headers['expires'];
+			if (expires) {
+				var expiresDate = new Date(expires);
+				var now = new Date().getTime();
+				if (expiresDate.getTime() <= now + 1000) {
+					expiresDate.setTime(now + conf.force_cached_time * 1000);
+					this.r4_headers['expires'] = expiresDate.toGMTString();
+				}
+				this.r4_headers['X-Accel-Expires'] = '@' + ((expiresDate.getTime() / 1000) >> 0);
+			} else {
+				this.r4_headers['X-Accel-Expires'] = String(conf.force_cached_time * 1000);
+			}
 		}
-		this.resHeaders['Content-Length'] = len;
-		this.res.writeHead(this.proxyStatusCode, this.resHeaders);
+		if (zipped)
+			this.r4_headers['content-encoding'] = 'gzip';
+		if (len)
+			this.r4_headers['content-length'] = len;
+		if (conf.server_header)
+			this.r4_headers['server'] = conf.server_header;
+		this.r4.writeHead(this.r3_statusCode, this.r4_headers);
 	},
 
 	send : function (err, body) {
-		if (this.proxyContentType) {
-			body = processContent(this.path, this.proxyContentType, body);
-		}
-		if (this.compressible && body.length > 0) { // 可压缩且有数据
+		if (body.length)
+			body = processContent(this.path, this.r3_contentType, body);
+		if (conf.gzip_r4 && body.length > 0) { // 可压缩且有数据
 			zlib.gzip(body, function (err, buf) {
 				this.sendHeader(buf.length, true);
-				this.res.end(buf);
-			}
-				.bind(this));
+				this.r4.end(buf);
+			}.bind(this));
 		} else {
 			this.sendHeader(body.length);
-			this.res.end(body);
+			this.r4.end(body);
 		}
 	},
 
-	doProxy : function (res) {
-		this.res = res;
-		this.req_opts = buildReuqest(this.req);
+	doProxy : function (r4) {
+		this.r4 = r4;
+		this.r2_opts = buildReuqest(this.r1);
 		var that = this;
-		https.request(this.req_opts, function (pxRes) {
-			that.prepare(pxRes);
-			var body = new Buffer(0);
-			pxRes.on('end', function () {
-				if (that.proxyContentEncoding === 'gzip')
-					zlib.gunzip(body, that.send.bind(that));
-				else
-					that.send(null, body);
-			});
-			pxRes.on('data', function (data) {
-				body = Buffer.concat([body, data]);
-			});
+		https.request(this.r2_opts, function (r3) {
+			that.prepare(r3);
+			if (that.compressible) {
+				var body = new Buffer(0);
+				r3.on('end', function () {
+					if (that.r3_contentEncoding === 'gzip')
+						zlib.gunzip(body, that.send.bind(that));
+					else
+						that.send(null, body);
+				}).on('data', function (data) {
+					body = Buffer.concat([body, data]);
+				});
+			} else { // 非文本直接通过
+				that.sendHeader();
+				r3.pipe(r4);
+			}
 		}).on('error', function (e) {
-			res.writeHead(e.statusCode);
-			res.end(e.message);
+			r4.writeHead(e.statusCode);
+			r4.end(String(e));
 		}).end();
 	}
 });
 
-module.exports = function (req, res) {
-	var proto = req.headers['x-forwarded-proto'];
-	if (proto === 'https') {
-		if (req.url.startsWith('/gen_204')) {
-			res.writeHead(204);
-			res.end();
-		} else
-			new GSession(req).doProxy(res);
-	} else {
-		res.writeHead(301, {
-			'Location' : 'https://' + req.headers['host'] + req.url
+module.exports = function (r1, r4) {
+	if (conf.force_https && r1.headers['x-forwarded-proto'] !== 'https') {
+		r4.writeHead(301, {
+			'Location': 'https://' + r1.headers['host'] + r1.url
 		});
-		res.end();
+		r4.end();
 	}
+	if (r1.url.startsWith('/gen_204')) {
+		r4.writeHead(204);
+		r4.end();
+	} else
+		new GSession(r1).doProxy(r4);
 };
