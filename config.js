@@ -1,30 +1,30 @@
 var default_config = {
 	/**
-	 * force_https		Ç¿ÖÆÒªÇóÈë¿Ú·ÃÎÊĞ­Òéhttps£¬Í¨¹ıhttp-header.x-forwarded-proto½øĞĞÅĞ¶Ï¡£
+	 * force_https		å¼ºåˆ¶è¦æ±‚å…¥å£è®¿é—®åè®®httpsï¼Œé€šè¿‡http-header.x-forwarded-protoè¿›è¡Œåˆ¤æ–­ã€‚
 	 */
 	force_https: true
 	/**
-	 * backend_https	Ç¿ÖÆÒªÇó³öÕ¾·ÃÎÊ£¨R2½×¶Î£©Ê¹ÓÃhttps£¬ÈôË½ÃÜĞÔÒªÇó²»¸ß£¬¿ÉÒÔÖÃÎªfalse½ÚÊ¡Ğ©Á¬½ÓÊ±¼ä¡£
+	 * backend_https	å¼ºåˆ¶è¦æ±‚å‡ºç«™è®¿é—®ï¼ˆR2é˜¶æ®µï¼‰ä½¿ç”¨httpsï¼Œè‹¥ç§å¯†æ€§è¦æ±‚ä¸é«˜ï¼Œå¯ä»¥ç½®ä¸ºfalseèŠ‚çœäº›è¿æ¥æ—¶é—´ã€‚
 	 */
 	,backend_https : false
 	/**
-	 * server_header	Ìí¼Ó×Ô¶¨ÒåserverÍ·£¬ÖÃÎªnullÔò²»Ìí¼Ó¡£
+	 * server_header	æ·»åŠ è‡ªå®šä¹‰serverå¤´ï¼Œç½®ä¸ºnullåˆ™ä¸æ·»åŠ ã€‚
 	 */
 	,server_header : 'MyServer'
 	/**
-	 * force_cached_time	Èôºó¶ËÖ¸Ê¾²»»º´æ£¬ÊÇ·ñºöÂÔ²¢Ç¿ÖÆ»º´æµÄÊ±¼ä£¬µ¥Î»Ãë¡£ÈôÔÊĞíÎŞ»º´æµÄÇëÇó£¬ÔòÖÃÎª¸ºÊı¡£
+	 * force_cached_time	è‹¥åç«¯æŒ‡ç¤ºä¸ç¼“å­˜ï¼Œæ˜¯å¦å¿½ç•¥å¹¶å¼ºåˆ¶ç¼“å­˜çš„æ—¶é—´ï¼Œå•ä½ç§’ã€‚è‹¥å…è®¸æ— ç¼“å­˜çš„è¯·æ±‚ï¼Œåˆ™ç½®ä¸ºè´Ÿæ•°ã€‚
 	 */
 	,force_cached_time : 1800
 	/**
-	 * gzip_r4			´¦ÀíÍê·µ»ØÏìÓ¦Ê±£¨R4½×¶Î£©ÊÇ·ñÓÃgzipÑ¹Ëõ¡£ÈôÓĞÇ°ÖÃnginx´úÀí/CDN£¬ÔòÓ¦¸ÃÓÅÏÈÊ¹ÓÃnginxÑ¹Ëõ¡£
+	 * gzip_r4			å¤„ç†å®Œè¿”å›å“åº”æ—¶ï¼ˆR4é˜¶æ®µï¼‰æ˜¯å¦ç”¨gzipå‹ç¼©ã€‚è‹¥æœ‰å‰ç½®nginxä»£ç†/CDNï¼Œåˆ™åº”è¯¥ä¼˜å…ˆä½¿ç”¨nginxå‹ç¼©ã€‚
 	 */
 	,gzip_r4 : false
 	/**
-	 * logging			ÊÇ·ñÆôÓÃ¼òµ¥logÈÕÖ¾
+	 * logging			æ˜¯å¦å¯ç”¨ç®€å•logæ—¥å¿—
 	 */
 	,logging : true
 	/**
-	 * trust_proxy		ÊÇ·ñĞÅÈÎÇ°¶Ë´úÀí»ñÈ¡ÕæÊµipµØÖ·£¨¹¤×÷ÔÚnginx»òcdnºó¶ËÊ±ĞèÒª´ò¿ª£©¡£
+	 * trust_proxy		æ˜¯å¦ä¿¡ä»»å‰ç«¯ä»£ç†è·å–çœŸå®ipåœ°å€ï¼ˆå·¥ä½œåœ¨nginxæˆ–cdnåç«¯æ—¶éœ€è¦æ‰“å¼€ï¼‰ã€‚
 	 */
 	,trust_proxy : true
 };
@@ -34,7 +34,7 @@ var rules = {
 			"pathRegex" : /\/(search|webhp)/,
 			"pattern" : /onmousedown=\"[^\"]+?\"/g,
 			"replacement" : "target=\"_blank\""
-			/* »»µô /search rwt */
+			/* æ¢æ‰ /search rwt */
 		}, {
 			"pathRegex" : /\/(search|webhp)/,
 			"pattern" : /onmousedown\\\\x3d\\\\x22.+?\\\\x22/g,
@@ -42,29 +42,29 @@ var rules = {
 		}, {
 			"pattern" : /pushdown_promo:/,
 			"replacement" : "_:"
-			/* ÂËµôÊÖ»ú¶¥²¿banner */
+			/* æ»¤æ‰æ‰‹æœºé¡¶éƒ¨banner */
 		}, {
 			"pattern" : /\/\/(?=ssl\.)/g,
 			"replacement" : "/!"
-			/* ÖØĞ´¾ø¶ÔµØÖ· */
+			/* é‡å†™ç»å¯¹åœ°å€ */
 		}, {
 			"pattern" : /([htps]+:)?\/\/www\.google\.com/g,
 			"replacement" : ""
-			/* ÖØĞ´¾ø¶ÔµØÖ· */
+			/* é‡å†™ç»å¯¹åœ°å€ */
 		}, {
 			"pattern" : /google\.log=/,
 			"replacement" : "google.log=function(){};_log="
-			/* ½ûÓÃlog£¬È¥µôgen_204ÇëÇó */
+			/* ç¦ç”¨logï¼Œå»æ‰gen_204è¯·æ±‚ */
 		}
 	],
 	js : [{
 			"pattern" : /([htps]+:)?\/\/www\.google\.com/g,
 			"replacement" : ""
-			/* ÖØĞ´xjs,rs¾ø¶ÔµØÖ· */
+			/* é‡å†™xjs,rsç»å¯¹åœ°å€ */
 		}, {
 			"pattern" : /_\.mg=/,
 			"replacement" : "_.mg=function(){};_mg="
-			/* ½ûÓÃ¼àÌı£¬È¥µôgen_204ÇëÇó */
+			/* ç¦ç”¨ç›‘å¬ï¼Œå»æ‰gen_204è¯·æ±‚ */
 		}
 	],
 	json : [{
