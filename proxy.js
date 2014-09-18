@@ -175,7 +175,7 @@ apply(GSession.prototype, {
 				r3.pipe(r4);
 			}
 		}).on('error', function (e) {
-			r4.writeHead(e.statusCode);
+			r4.writeHead(e.statusCode ? e.statusCode : 502);
 			r4.end(String(e));
 		}).end();
 	}
