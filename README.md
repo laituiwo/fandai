@@ -10,7 +10,7 @@ AirGoo专注于反代形式提供谷歌搜索服务，以轻便快为奋斗目�
 
 如需帮助请在项目issues中提问。
 
-## 运行
+# 运行
 
 需要安装NodeJs 0.10.x运行环境
 ```
@@ -24,60 +24,58 @@ $ node server.js
 - AirGoo-Server started on 4:0.0.0.0:8080
 ```
 
-若需要以后台服务方式运行，推荐安装[forever](https://github.com/nodejitsu/forever)，并阅读其配置指南。
+若需要以后台服务方式运行，安装[forever](https://github.com/nodejitsu/forever)，并阅读其配置指南。
 
 更简单的方式则是在`screen`命令下运行保持应用不离线，更多信息`man screen`手册。
 
-**注**，通常应该以Nginx/Apache等作为前端入口并提供https服务与后端AirGoo协同工作，尤其是独立服务器/VPS用户。
+**注**，通常应该以Nginx/Apache等作为前端入口并提供https/spdy服务，与后端AirGoo协同工作，尤其是独立服务器/VPS用户。
 
-## 工作模式
+# 工作模式
 
-AirGoo不同于其它直接Nginx反代，因其出站不能压缩，流量大延迟高、处理有限不够灵活。
+AirGoo不同于直接Nginx反代，因其出站不能压缩，流量大延迟高、处理有限不够灵活。
 
 AirGoo推荐的工作模式：
 
-### 二级/多级中间缓存
+## 二级/多级中间缓存
 
 ![二级/多级中间缓存](https://i.imgur.com/nU5lCui.png)
 此模式下，AirGoo使用一定缓存策略，让Nginx对静态资源进行缓存，除了必须的查询其它请求都将由Cache回复，此举可以省掉92%请求量(首页)，不但大大的节省了出站流量，也让前端响应也变得更快。
 
-**注**，可部署为中小规模集群（1*Nginx + N*AirGoo），任意upstream策略都能工作的很好，且后端压力和流量极少。
+**注**：可部署为中小规模集群（1*Nginx + N*AirGoo），任意upstream策略都能工作的很好，且后端压力和流量极少。
 
-**注**，建议在Nginx中启用spdy协议。
+**注**：建议在Nginx中启用spdy协议。
 
-关于Nginx的示意配置，请查看项目的wiki页面。
+# 配置
 
-## 配置
+**独立服务器/VPS/IaaS用户，前端的Nginx/Apache可以参考wiki中示意配置。**
 
-*独立服务器/VPS用户，关于前端Nginx/Apache可以参考wiki中示意配置。*
+**通常各类PaaS都使用环境变量，和其运行配置文件定义运行命令行，用户应用的前面有Nginx等做为前端路由（可能有https支持），并由其虚拟容器托管运行，因此相当于二级无中间缓存的模式。**
 
-*通常各类PaaS都使用环境变量，和其运行配置文件定义运行命令行，用户应用的前面有Nginx等做为前端路由（可能有https支持），并由其虚拟容器托管运行，因此相当于二级无中间缓存的模式。*
-
-###启动参数部分
+## 启动参数
 
 - 监听地址，命令行参数[-a 0.0.0.0] `>` 环境变量[IP] `>` 默认[0.0.0.0]
 - 监听端口，命令行参数[-p 8080] `>` 环境变量[PORT] `>` 默认[8080]
 - 工作参数文件，命令行参数[-c file] `>` 环境变量[AIRGOO_CONF] `>` 默认当前目录[config.json]
 
-命令行参数`-h`查看此类帮助，这里的`>`表示作用优先级左端高于右端。
+命令参数`-h`查看此类帮助，这里的`>`表示作用优先级左端高于右端。
 
-###工作参数部分
+## 工作参数
 
 配置在config.json中，标准json格式。
 
 ```json
 {
-	// 强制要求入口访问协议https，通过http-header.x-forwarded-proto进行判断
 	// 通常Paas/CDN都能正确的发送x-forwarded头，而自部署Nginx用户需要参考wiki示意
+	// 强制要求入口访问协议https，通过http-header.x-forwarded-proto进行判断
     "force_https": true,  
 
-	// 强制要求出站访问（R2阶段）使用https，若私密性要求不高，可置为false节省连接时间。
+	// 强制要求出站访问（R2阶段）使用https，若私密性要求不高，可置为false节省连接时间
     "backend_https": false,  
 
 	// 添加自定义server头，置为null则不添加。
     "server_header": "AirGoo",  
 
-	// 当后端要求不缓存，是否忽略并强制缓存，单位秒。若允许无缓存的请求，则置为负数。
+	// 当后端要求不缓存，是否忽略并强制缓存，单位秒。若允许无缓存的请求，则置为负数
     "force_cached_time": 1800,  
 
 	// 处理完返回响应时（R4阶段）是否用gzip压缩
@@ -88,7 +86,7 @@ AirGoo推荐的工作模式：
 	// 是否启用简单log日志
     "logging": true,  
 
-	// 是否信任前端转发地址为真实用户地址（在nginx/cdn/paas后时需要打开）
+	// 是否信任前端转发地址为真实用户地址（在nginx/cdn/paas后时打开）
     "trust_proxy": true,  
 
 	// 声明优先语言
@@ -112,6 +110,12 @@ AirGoo推荐的工作模式：
 **注**：正式启用的`config.json`中不要包含上述注释。
 
 ## ChangeLog
+
+V1.1.1
+
+修复content-length错误；
+
+修复命令参数提取错误；
 
 V1.1.0
 

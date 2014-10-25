@@ -214,7 +214,7 @@ var AirGooSession = function (r1, r4) {
         }
         if (zipped)
             this.r4_headers['content-encoding'] = 'gzip';
-        if (len)
+        if (len >= 0)
             this.r4_headers['content-length'] = len;
         if (CONF.server_header)
             this.r4_headers['server'] = CONF.server_header;
@@ -353,7 +353,7 @@ var AirGooServer = function () {
 
         require('http').createServer(self.requestHandler)
             .on('listening', function () {
-                log('AirGoo-Server started on %s', this._connectionKey);
+                log('AirGoo-Server v%s started on %s', defines.version, this._connectionKey);
             })
             .listen(self.options.port, self.options.addr);
     }

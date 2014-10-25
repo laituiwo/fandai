@@ -1,6 +1,6 @@
 {
 	"name" : "AirGoo",
-	"version" : "1.1.0",
+	"version" : "1.1.1",
 	"description" : "A shortcut to access Google service, Beating the firewall.",
 	"main" : "server.js",
 	"repository" : {

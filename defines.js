@@ -1,7 +1,11 @@
 var util = require('util'),
-    fs = require('fs');
+    fs = require('fs'),
+    path = require('path');
 
-var VERSION = '1.1.0';
+var VERSION = (function(){
+    var packageFile = fs.readFileSync('package.json');
+    return JSON.parse(packageFile)['version'];
+})();
 
 var default_config = {
     force_https: true,
@@ -93,14 +97,15 @@ var ext_domains = [
 ];
 
 var helps = [
-        'AirGoo@' + VERSION,
+    'AirGoo v' + VERSION,
     '\t A shortcut to access Google service, Beating the firewall.',
+    '',
     'More information:',
     '\t AirGoo@Github <http://github.com/spance/AirGoo>',
-    'If you need help, you could ask questions in AirGoo@Github.issues',
-    '\t',
+    'If you need help, you could ask questions on AirGoo@Github.issues',
+    '',
     [
-        'Usage: node', mainName(),
+        'Usage: node', mainName()[1],
         '[-a address]', '[-p port]', '[-c config file]'
     ].join(' ')
 ];
@@ -183,8 +188,8 @@ var apply = function (dest, src, defaults) {
 
 
 function mainName() {
-    var name = process.mainModule.filename, pos = name.lastIndexOf('/');
-    return pos > -1 ? name.substr(pos + 1) : name;
+    var fullpath = process.mainModule.filename, name = path.basename(fullpath);
+    return [fullpath, name];
 }
 
 
@@ -209,15 +214,14 @@ function abort(msg) {
     var args = util.isArray(msg) ? msg : ['Error: ', msg];
     args.push(' ');
     util.puts.apply(util, args);
-    console.log(msg);
     process.exit(1);
 }
 
 
 function parse_options(defaults) {
-    var args = [];
+    var args = [], _mainName = mainName()[0];
     process.argv.forEach(function (item, i) {
-        if (item === module.filename) {
+        if (item === _mainName) {
             args = process.argv.slice(i + 1);
             return false;
         }
@@ -320,6 +324,7 @@ var format = function split(fmt) {
 
 module.exports = {
 
+    version: VERSION,
     rules: rules,
     excludedHeaders: excludedHeaders,
 
