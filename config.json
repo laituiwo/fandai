@@ -1,0 +1,26 @@
+{
+    "force_https": true,
+
+    "backend_https": false,
+
+    "server_header": "AirGoo",
+
+    "force_cached_time": 1800,
+
+    "gzip_r4": false,
+
+    "logging": true,
+
+    "trust_proxy": true,
+
+    "prefer_lang": "zh-CN",
+
+    "max_transmit_size": 10485760,
+
+    "ext_domains": [
+        ".google.com",
+        ".gstatic.com",
+        ".googleapis.com",
+        ".googleusercontent.com"
+    ]
+}

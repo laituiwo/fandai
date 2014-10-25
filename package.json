@@ -1,11 +1,11 @@
 {
-	"name" : "AirGoogle",
-	"version" : "1.0",
-	"description" : "AirGoogle is a very handy Google search mirror, and includes a few improved features.",
+	"name" : "AirGoo",
+	"version" : "1.1.0",
+	"description" : "A shortcut to access Google service, Beating the firewall.",
 	"main" : "server.js",
 	"repository" : {
 		"type" : "git",
-		"url" : "https://github.com/spance/AirGoogle.git"
+		"url" : "https://github.com/spance/AirGoo.git"
 	},
 	"author" : "Spance Wong <spance.wong@gmail.com>",
 	"engines" : {
