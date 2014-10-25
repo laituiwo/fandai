@@ -24,7 +24,7 @@ $ node server.js
 - AirGoo-Server started on 4:0.0.0.0:8080
 ```
 
-若需要以后台服务方式运行，安装[forever](https://github.com/nodejitsu/forever)，并阅读其配置指南。
+若需要以后台服务方式运行，安装[Supervisor](https://github.com/Supervisor/supervisor)或[forever](https://github.com/nodejitsu/forever)，并阅读其配置指南。
 
 更简单的方式则是在`screen`命令下运行保持应用不离线，更多信息`man screen`手册。
 
