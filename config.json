@@ -1,4 +1,8 @@
 {
+    "listen_address": "0.0.0.0",
+
+    "listen_port": 8080,
+
     "force_https": true,
 
     "backend_https": false,

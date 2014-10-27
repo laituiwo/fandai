@@ -10,54 +10,56 @@ AirGoo专注于反代形式提供谷歌搜索服务，以轻便快为奋斗目�
 
 如需帮助请在项目issues中提问。
 
-# 运行
+# 安装和运行
 
-需要安装NodeJs 0.10.x运行环境
-```
-sudo apt-get install nodejs npm    # 使用`apt-get/yum`等包管理器安装
-```
-或从[Nodejs.org](http://nodejs.org/download/)下载安装。
+需要NodeJs 0.10.x运行环境。
 
-[下载本项目](https://github.com/spance/AirGoo/archive/master.zip)至任意位置，最基本的运行方式：
+1. 使用apt-get, yum等安装 ` sudo apt-get install nodejs npm ` 或从 [http://nodejs.org/download/](http://nodejs.org/download/) 下载；
+
+2. [下载本项目](https://github.com/spance/AirGoo/archive/master.zip)至任意位置；
+
+3. 基本运行方式：
+
 ```
 $ node server.js
 - AirGoo-Server started on 4:0.0.0.0:8080
 ```
 
-若需要以后台服务方式运行，安装[Supervisor](https://github.com/Supervisor/supervisor)或[forever](https://github.com/nodejitsu/forever)，并阅读其配置指南。
+若需要以后台服务方式运行，安装 `node-supervisor` 或 `forever`，或upstart/service-rc.d等，并阅读其配置指南。
 
 更简单的方式则是在`screen`命令下运行保持应用不离线，更多信息`man screen`手册。
 
-**注**，通常应该以Nginx/Apache等作为前端入口并提供https/spdy服务，与后端AirGoo协同工作，尤其是独立服务器/VPS用户。
+**注**：通常应该以Nginx/Apache等作为前端入口并提供https/spdy服务，与后端AirGoo协同工作，尤其是独立服务器/VPS用户。
+
+**注**：为了应对Google的更新变化，请关注并跟随版本升级。
 
 # 工作模式
 
 AirGoo不同于直接Nginx反代，因其出站不能压缩，流量大延迟高、处理有限不够灵活。
 
-AirGoo推荐的工作模式：
-
-## 二级/多级中间缓存
+AirGoo推荐的工作模式： **二级/多级中间缓存**
 
 ![二级/多级中间缓存](https://i.imgur.com/nU5lCui.png)
+
 此模式下，AirGoo使用一定缓存策略，让Nginx对静态资源进行缓存，除了必须的查询其它请求都将由Cache回复，此举可以省掉92%请求量(首页)，不但大大的节省了出站流量，也让前端响应也变得更快。
 
 **注**：可部署为中小规模集群（1*Nginx + N*AirGoo），任意upstream策略都能工作的很好，且后端压力和流量极少。
 
-**注**：建议在Nginx中启用spdy协议。
+**注**：建议在Nginx中启用spdy协议，以获得更好的并发性能。（需要1.6以上版本或自行编译）
 
 # 配置
 
-**独立服务器/VPS/IaaS用户，前端的Nginx/Apache可以参考wiki中示意配置。**
+独立服务器/VPS/IaaS用户，前端的Nginx/Apache可以 **参考项目[Wiki](https://github.com/spance/AirGoo/wiki)中示意配置。**
 
-**通常各类PaaS都使用环境变量，和其运行配置文件定义运行命令行，用户应用的前面有Nginx等做为前端路由（可能有https支持），并由其虚拟容器托管运行，因此相当于二级无中间缓存的模式。**
+通常各类PaaS都使用环境变量，和其运行配置文件定义运行命令行，用户应用的前面有Nginx等做为前端路由（可能有https支持），并由其虚拟容器托管运行，因此相当于二级无中间缓存的模式。
 
 ## 启动参数
 
-- 监听地址，命令行参数[-a 0.0.0.0] `>` 环境变量[IP] `>` 默认[0.0.0.0]
-- 监听端口，命令行参数[-p 8080] `>` 环境变量[PORT] `>` 默认[8080]
+- 监听地址，命令行参数[-a 0.0.0.0] `>` 参数文件[listen_address] `>` 默认[0.0.0.0]
+- 监听端口，命令行参数[-p 8080] `>` 参数文件[listen_port] `>` 默认[8080]
 - 工作参数文件，命令行参数[-c file] `>` 环境变量[AIRGOO_CONF] `>` 默认当前目录[config.json]
 
-命令参数`-h`查看此类帮助，这里的`>`表示作用优先级左端高于右端。
+命令参数 `-h` 查看此类帮助，这里的`>`表示作用优先级左端高于右端。
 
 ## 工作参数
 
@@ -65,7 +67,17 @@ AirGoo推荐的工作模式：
 
 ```json
 {
-	// 通常Paas/CDN都能正确的发送x-forwarded头，而自部署Nginx用户需要参考wiki示意
+    // 监听地址，优先级低于命令参数
+    // 允许 "1.2.3.4" 常量值形式
+    // 允许 "{IP}" 用环境变量IP值，PaaS用户请查阅服务商指南
+    "listen_address": "0.0.0.0",
+    
+    // 监听端口，优先级低于命令参数
+    // 允许 8080 常量值形式
+    // 允许 "{PORT}" 用环境变量PORT值，PaaS用户请查阅服务商指南
+    "listen_port": 8080,
+    
+	// 通常PaaS/CDN都能正确的发送x-forwarded头，而自部署Nginx用户需要参考wiki示意
 	// 强制要求入口访问协议https，通过http-header.x-forwarded-proto进行判断
     "force_https": true,  
 
@@ -109,7 +121,13 @@ AirGoo推荐的工作模式：
 
 **注**：正式启用的`config.json`中不要包含上述注释。
 
-## ChangeLog
+# ChangeLog
+
+V1.1.2
+
+增加addr,port定义到文件
+
+改为绝对地址适应外部运行
 
 V1.1.1
 

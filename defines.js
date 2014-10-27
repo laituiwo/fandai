@@ -2,8 +2,11 @@ var util = require('util'),
     fs = require('fs'),
     path = require('path');
 
-var VERSION = (function(){
-    var packageFile = fs.readFileSync('package.json');
+var basedir;
+
+var VERSION = (function () {
+    basedir = path.dirname(__filename);
+    var packageFile = fs.readFileSync(path.join(basedir, 'package.json'));
     return JSON.parse(packageFile)['version'];
 })();
 
@@ -97,7 +100,7 @@ var ext_domains = [
 ];
 
 var helps = [
-    'AirGoo v' + VERSION,
+        'AirGoo v' + VERSION,
     '\t A shortcut to access Google service, Beating the firewall.',
     '',
     'More information:',
@@ -194,15 +197,33 @@ function mainName() {
 
 
 function initialize() {
-    var user = {}, file;
+    var user = {}, env = process.env;
     var opts = parse_options({
-        addr: process.env.IP || '0.0.0.0',
-        port: process.env.PORT || 8080,
-        conf: process.env.AIRGOO_CONF || process.env.airgoo_conf || 'config.json'
+        addr: '0.0.0.0',
+        port: 8080,
+        conf: env.AIRGOO_CONF || env.airgoo_conf || 'config.json'
     });
+    opts.conf = path.join(basedir, opts.conf);
     if (fs.existsSync(opts.conf)) {
-        file = fs.readFileSync(opts.conf);
-        user = JSON.parse(file);
+        var file = fs.readFileSync(opts.conf); // maybe throw
+        user = JSON.parse(file); // maybe throw
+        var applyEnv = function (ma, g1) {
+            if (g1 in process.env)
+                return env[g1];
+            else
+                abort(format('Invalid environment variable "%s" for listen_address', g1));
+        };
+        // 0xf: addr set
+        if (user.listen_address && !(opts.priority & 0xf))
+            opts.addr = String(user.listen_address).replace(/\{(\w+)\}/g, applyEnv);
+        // 0xf0: port set
+        if (user.listen_port && !(opts.priority & 0xf0)) {
+            var port = String(user.listen_port).replace(/\{(\w+)\}/g, applyEnv);
+            if (!/^\d+$/.test(port) || (port = parseInt(port), false) || port > 65535 || port < 0)
+                abort(format('Invalid listen port %d in %s', port, opts.conf));
+            else
+                opts.port = port;
+        }
     }
     whiteList = buildSuffixTrie(user.ext_domains || ext_domains);
     config = apply({}, user, default_config);
@@ -235,6 +256,7 @@ function parse_options(defaults) {
                 if (!token)
                     abort('Option requires an argument -a (listen address)');
                 opts.addr = token;
+                opts.priority |= 0xf;
                 break;
             case '-p':
                 token = args.shift();
@@ -244,6 +266,7 @@ function parse_options(defaults) {
                 if (!/^\d+$/.test(token) || (port = parseInt(token), false) || port > 65535 || port < 0)
                     abort('Invalid listen port ' + token);
                 opts.port = parseInt(port);
+                opts.priority |= 0xf0;
                 break;
             case '-c':
                 token = args.shift();
