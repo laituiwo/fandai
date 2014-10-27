@@ -14,11 +14,11 @@ AirGoo专注于反代形式提供谷歌搜索服务，以轻便快为奋斗目�
 
 需要NodeJs 0.10.x运行环境。
 
-1. 使用apt-get, yum等安装 ` sudo apt-get install nodejs npm ` 或从 [http://nodejs.org/download/](http://nodejs.org/download/) 下载；
+使用apt-get, yum等安装 ` sudo apt-get install nodejs npm ` 或从 [http://nodejs.org/download/](http://nodejs.org/download/) 下载；
 
-2. [下载本项目](https://github.com/spance/AirGoo/archive/master.zip)至任意位置；
+[下载本项目](https://github.com/spance/AirGoo/archive/master.zip)至任意位置；
 
-3. 基本运行方式：
+基本运行方式：
 
 ```
 $ node server.js
@@ -45,7 +45,7 @@ AirGoo推荐的工作模式： **二级/多级中间缓存**
 
 **注**：可部署为中小规模集群（1*Nginx + N*AirGoo），任意upstream策略都能工作的很好，且后端压力和流量极少。
 
-**注**：建议在Nginx中启用spdy协议，以获得更好的并发性能。（需要1.6以上版本或自行编译）
+**注**：建议在Nginx中启用spdy协议。（需要1.6以上版本或自行编译）
 
 # 配置
 
