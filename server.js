@@ -1,7 +1,7 @@
 //
 // # AirGoo Server
 //
-
+var heapdump = require('heapdump');
 var options = require("./defines").initialize();
 var AirGooServer = require("./airgoo");
 

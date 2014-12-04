@@ -1,22 +1,44 @@
 # AirGoo
 
-AirGoo专注于反代形式提供谷歌搜索服务，以轻便快为奋斗目标。
+提供最便捷的方法还原谷歌服务。
 
-- 无二次Url跳转，要直接不要等待
-- 去除了部分banner广告
-- 去除了部分无关请求
-- 极少的通信量和通信次数(启用Cache)
-- ....
+如有建议或需帮助请在[issues](https://github.com/spance/AirGoo/issues)中提出。
 
-如需帮助请在项目issues中提问。
+# Features
 
-# 安装和运行
+力求顺畅和逼真是首要目标，另外还有：
 
-需要NodeJs 0.10.x运行环境。
+- 搜索结果没有二次Url跳转不需要等待
+- 去除了部分推销广告
+- 减少传输量和次数(启用Cache)
 
-使用apt-get, yum等安装 ` sudo apt-get install nodejs npm ` 或从 [http://nodejs.org/download/](http://nodejs.org/download/) 下载；
+# 原理和解释
 
-[下载本项目](https://github.com/spance/AirGoo/archive/master.zip)至任意位置；
+受限于某些黑政策，国内都无法使用Google服务，尤其是搜素服务，而且目前地球上还没有其它替代品（人生苦短请不要浪费在其它自称为搜索的产品上），于是便有各种方法来曲径通幽。各种隧道和翻墙工具就不多说了，做为重量级手段它们都是正确的稳妥的，但对于一个高频度使用的Google服务来说，反代显然是所有方法中最便捷的。
+
+然而，反代Google近乎完美的提供服务并不是想想的那么容易，AirGoo就是为了解决这些问题而产生的，只要你的链路够快，AirGoo就能提供近乎完美和逼真的基础Google体验。当然Google的产品线十分庞大和复杂，AirGoo不可能还原所有的Google服务，以最常用的搜素为基本服务内容。
+
+这里不提供demo和直接可用的服务，开源就是为了“渔”而不是“鱼”，让翻越从单点集中迈向散点分布式。
+
+工作原理和推荐的工作模式：**二级/多级中间缓存** 
+
+![二级/多级中间缓存](https://i.imgur.com/nU5lCui.png)
+
+AirGoo会检查和使用一定缓存策略，让Nginx对静态资源进行缓存，除了必须的查询其它请求都将由Cache回复，此举可以省掉92%请求量(首页)，不但大大的节省了出站流量，也让前端响应也变得更快。
+
+# 安装
+
+首先需要一个无障碍的境外服务器或云环境。
+
+需要 `Node.js` 运行环境，使用 `apt-get/yum` 等安装或从 [http://nodejs.org/download/](http://nodejs.org/download/) 下载。
+
+[下载本项目](https://github.com/spance/AirGoo/archive/master.zip)至任意位置。
+
+目前仅有基于Node.js实现的版本，以后会增加其它语言的实现。
+
+为了应对Google的更新变化，请关注并跟随版本升级。
+
+# 运行
 
 基本运行方式：
 
@@ -25,33 +47,17 @@ $ node server.js
 - AirGoo-Server started on 4:0.0.0.0:8080
 ```
 
-若需要以后台服务方式运行，安装 `node-supervisor` 或 `forever`，或upstart/service-rc.d等，并阅读其配置指南。
+后台服务运行的方式有很多，常见方法都适用；更简单的通用大法，以`screen`命令来保持应用。
 
-更简单的方式则是在`screen`命令下运行保持应用不离线，更多信息`man screen`手册。
+在结构上，通常应该以Nginx/Apache等作为前端入口提供https/spdy服务，缓存及分发请求到后端AirGoo，尤其是独立服务器/IaaS/VPS用户。
 
-**注**：通常应该以Nginx/Apache等作为前端入口并提供https/spdy服务，与后端AirGoo协同工作，尤其是独立服务器/VPS用户。
-
-**注**：为了应对Google的更新变化，请关注并跟随版本升级。
-
-# 工作模式
-
-AirGoo不同于直接Nginx反代，因其出站不能压缩，流量大延迟高、处理有限不够灵活。
-
-AirGoo推荐的工作模式： **二级/多级中间缓存**
-
-![二级/多级中间缓存](https://i.imgur.com/nU5lCui.png)
-
-此模式下，AirGoo使用一定缓存策略，让Nginx对静态资源进行缓存，除了必须的查询其它请求都将由Cache回复，此举可以省掉92%请求量(首页)，不但大大的节省了出站流量，也让前端响应也变得更快。
-
-**注**：可部署为中小规模集群（1*Nginx + N*AirGoo），任意upstream策略都能工作的很好，且后端压力和流量极少。
-
-**注**：建议在Nginx中启用spdy协议。（需要1.6以上版本或自行编译）
+若要提供公开的服务，则建议部署为中小规模集群1\*Nginx + N\*AirGoo，但不建议这么做，除非能拥有很多的出站地址以防滥用嫌疑和很多的入站地址来防黑政策。
 
 # 配置
 
-独立服务器/VPS/IaaS用户，前端的Nginx/Apache可以 **参考项目[Wiki](https://github.com/spance/AirGoo/wiki)中示意配置。**
+独立服务器/VPS/IaaS用户，前端Nginx可以参考 [Wiki示意配置](https://github.com/spance/AirGoo/wiki)，建议在Nginx中启用spdy协议（建议1.7.3以上版本或自行编译）。
 
-通常各类PaaS都使用环境变量，和其运行配置文件定义运行命令行，用户应用的前面有Nginx等做为前端路由（可能有https支持），并由其虚拟容器托管运行，因此相当于二级无中间缓存的模式。
+通常各类PaaS都使用环境变量、运行配置文件定义运行方法，用户应用的前通常有Nginx等做为前端路由(和https)，由其虚拟容器托管运行，相当于二级无缓存的模式。
 
 ## 启动参数
 
@@ -102,10 +108,16 @@ AirGoo推荐的工作模式： **二级/多级中间缓存**
     "trust_proxy": true,  
 
 	// 声明优先语言
-    "prefer_lang": "zh-CN",  
-
+    "prefer_lang": "zh-CN",
+    
 	// 限制每请求最大通行文件的大小，单位byte
     "max_transmit_size": 10485760,  
+    
+    // 目标 @since 1.1.3
+    "target_google": {
+        "host": "www",
+        "domain": "google.com"
+    },
 
 	// 允许通行的第三方域，无通配符无正则
     "ext_domains": [  
@@ -117,11 +129,22 @@ AirGoo推荐的工作模式： **二级/多级中间缓存**
 }
 ```
 
-**注**：从1.0.0升级的用户，请注意转移对应的配置到`config.json`中。
-
 **注**：正式启用的`config.json`中不要包含上述注释。
 
+
 # ChangeLog
+
+V1.1.3
+
+调整国别域跳转处理方法
+
+新方式处理可能的abuse情况
+
+反代目标的动态处理
+
+优化和调整规则
+
+maps基本可用
 
 V1.1.2
 

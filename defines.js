@@ -4,11 +4,90 @@ var util = require('util'),
 
 var basedir;
 
-var VERSION = (function () {
+var VERSION = (function() {
     basedir = path.dirname(__filename);
     var packageFile = fs.readFileSync(path.join(basedir, 'package.json'));
     return JSON.parse(packageFile)['version'];
 })();
+
+var rules = {
+    html: [{
+            "pathRegex": /\/(search|webhp)/,
+            "pattern": /onmousedown="[^\"]+?"/g,
+            "replacement": "target=\"_blank\""
+                // 非ajax或手机搜索时，rwt直接输出在html中
+        }, {
+            "pattern": /(?:http(?:s)?:)?\/\/(?=[-\w]+\.gstatic)/g,
+            "replacement": "/!"
+                // gstatic
+        }, {
+            "pattern": /(?:http(?:s)?:)?\/\/www\.google\.com/g,
+            "replacement": ""
+                // W域下资源
+        }, {
+            "pattern": /(?:http(?:s)?:)?\/\/([-\w]+\.google\.com)/g,
+            "replacement": "/!$1"
+                // 其它域资源
+        }, {
+            "pattern": /pushdown_promo:/,
+            "replacement": "_:"
+                // 顶部promo
+        }
+        /*
+        {
+            "pattern": /"\/\/"/g,
+            "replacement": "\"/!\""
+            // dynamic load gstatic
+        },
+        {
+            "pattern": /google\.log=/,
+            "replacement": "google.log=function(){};_log="
+            // 去掉/gen_204
+        }
+        */
+    ],
+    js: [{
+            "pattern": /(?:http(?:s)?:)?\/\/www\.google\.com/g,
+            "replacement": ""
+                // 重写主域资源绝对地址
+        },
+        /*
+        {
+            "pathRegex": /\/xjs/,
+            "pattern": /window\.Image/g,
+            "replacement": "Object"
+        },
+        {
+            "pattern": /_\.mg=/,
+            "replacement": "_.mg=function(){};_mg="
+            // 禁用监听 gen_204
+        },
+        */
+        {
+            "pattern": /(?:http(?:s)?:)?\/\/(?=[-\w]+\.(?:google|gstatic))/g,
+            "replacement": "/!"
+        }
+    ],
+    json: [{
+        "pattern": /onmousedown\\\\x3d/g,
+        "replacement": "target\\\\x3d\\\\x22_blank\\\\x22 rwt\\\\x3d"
+            // 废掉ajax rwt
+    }, {
+        "pattern": /\(\\\/\\\/(?=[-\w]+\.gstatic)/g,
+        "replacement": "(\/!"
+            // css url
+    }, {
+        "pattern": /(?:http(?:s)?:)?\\\/\\\/www\.google\.com/g,
+        "replacement": 1
+            // 搜索工具data-url中存在href正则匹配，只能用动态绝对地址
+    }, {
+        "pathRegex": /\/(search|webhp)/,
+        "pattern": /(?:http(?:s)?:)?\\\/\\\/(?=id\.google)/,
+        "replacement": "/!"
+            // json 可能含有 verify
+    }]
+};
+
 
 var default_config = {
     force_https: true,
@@ -22,74 +101,9 @@ var default_config = {
     max_transmit_size: 10485760
 };
 
-var rules = {
-    html: [
-        {
-            "pathRegex": /\/(search|webhp)/,
-            "pattern": /onmousedown="[^\"]+?"/g,
-            "replacement": "target=\"_blank\""
-            /* /search @mobi */
-        },
-        {
-            "pathRegex": /\/(search|webhp)/,
-            "pattern": /(?:http(?:s)?:)?\/\/(?=id\.go)/,
-            "replacement": "/!"
-            /* @mobi */
-        },
-        {
-            "pattern": /(?:http(?:s)?:)?\/\/(?=\w+\.gstatic)/g,
-            "replacement": "/!"
-            /* gstatic */
-        },
-        {
-            "pattern": /(?:http(?:s)?:)?\/\/www\.google\.com/g,
-            "replacement": ""
-            /* /main res */
-        },
-        {
-            "pattern": /pushdown_promo:/,
-            "replacement": "_:"
-            /* 顶部promo */
-        },
-        {
-            "pattern": /google\.log=/,
-            "replacement": "google.log=function(){};_log="
-            /* 禁用log gen_204 */
-        }
-    ],
-    js: [
-        {
-            "pattern": /(?:http(?:s)?:)?\/\/www\.google\.com/g,
-            "replacement": ""
-            /* 重写xjs,rs绝对地址 */
-        },
-        {
-            "pathRegex": /\/xjs/,
-            "pattern": /window\.Image/g,
-            "replacement": "Object"
-        },
-        {
-            "pattern": /_\.mg=/,
-            "replacement": "_.mg=function(){};_mg="
-            /* 禁用监听 gen_204 */
-        },
-        {
-            "pathRegex": /\/search/,
-            "pattern": /(?:http(?:s)?:)?\/\/(?=\w+\.gstatic)/g,
-            "replacement": "/!"
-        }
-    ],
-    json: [
-        {
-            "pattern": /onmousedown\\\\x3d/g,
-            "replacement": "target\\\\x3d\\\\x22_blank\\\\x22 rwt\\\\x3d"
-        },
-        {
-            "pattern": /\(\\\/\\\/(?=\w+\.gstatic)/g,
-            "replacement": "(\/!"
-            // css url
-        }
-    ]
+var default_target_google = {
+    "host": "www",
+    "domain": ".google.com"
 };
 
 var ext_domains = [
@@ -99,15 +113,22 @@ var ext_domains = [
     ".googleusercontent.com"
 ];
 
+var cookieRequired = {
+    '/webhp': true,
+    '/search': true,
+    '/images': true,
+    '/imghp': true,
+    '/maps': true,
+};
+
 var helps = [
-        'AirGoo v' + VERSION,
+    'AirGoo v' + VERSION,
     '\t A shortcut to access Google service, Beating the firewall.',
     '',
     'More information:',
     '\t AirGoo@Github <http://github.com/spance/AirGoo>',
     'If you need help, you could ask questions on AirGoo@Github.issues',
-    '',
-    [
+    '', [
         'Usage: node', mainName()[1],
         '[-a address]', '[-p port]', '[-c config file]'
     ].join(' ')
@@ -116,8 +137,10 @@ var helps = [
 var excludedHeaders = {
     'host': true,
     'range': true,
+    'referer': true,
     'connection': true,
     'accept-encoding': true,
+    'accept-language': true,
     'transfer-encoding': true,
     'content-encoding': true,
     'alternate-protocol': true
@@ -138,7 +161,9 @@ function buildSuffixTrie(list) {
     var lLen = list.length;
     var tree = {};
     for (var j = 0; j < lLen; j++) {
-        var s = list[j], sLen = s.length, parent, level = null;
+        var s = list[j],
+            sLen = s.length,
+            parent, level = null;
         for (var char, i = sLen - 1; i >= 0; i--) {
             char = s[i];
             parent = level || tree;
@@ -162,7 +187,7 @@ function searchTrie(domain, gte_min) {
         level = parent[domain[i]];
         if (!level)
             return false;
-        if (level[EOF])  // gt_min hook
+        if (level[EOF]) // gt_min hook
             return true;
         parent = level;
     }
@@ -177,7 +202,7 @@ function searchTrie(domain, gte_min) {
  * @param defaults
  * @returns {*}
  */
-var apply = function (dest, src, defaults) {
+var apply = function(dest, src, defaults) {
     if (defaults) {
         apply(dest, defaults);
     }
@@ -191,13 +216,15 @@ var apply = function (dest, src, defaults) {
 
 
 function mainName() {
-    var fullpath = process.mainModule.filename, name = path.basename(fullpath);
+    var fullpath = process.mainModule.filename,
+        name = path.basename(fullpath);
     return [fullpath, name];
 }
 
 
 function initialize() {
-    var user = {}, env = process.env;
+    var user = {},
+        env = process.env;
     var opts = parse_options({
         addr: '0.0.0.0',
         port: 8080,
@@ -207,7 +234,7 @@ function initialize() {
     if (fs.existsSync(opts.conf)) {
         var file = fs.readFileSync(opts.conf); // maybe throw
         user = JSON.parse(file); // maybe throw
-        var applyEnv = function (ma, g1) {
+        var applyEnv = function(ma, g1) {
             if (g1 in process.env)
                 return env[g1];
             else
@@ -224,10 +251,28 @@ function initialize() {
             else
                 opts.port = port;
         }
+        if (user.target_google) {
+            if (typeof user.target_google !== typeof {}) {
+                abort('target_google is invalid');
+            }
+            if (!user.target_google.host) {
+                abort('target_google.host is required');
+            }
+            if (!user.target_google.domain) {
+                abort('target_google.domain is required');
+            }
+        }
     }
     whiteList = buildSuffixTrie(user.ext_domains || ext_domains);
     config = apply({}, user, default_config);
+    config.target = buildTarget(config.target_google || default_target_google);
     return opts;
+}
+
+function buildTarget(_target) {
+    return apply({
+        fullName: _target.host + '.' + _target.domain
+    }, _target)
 }
 
 
@@ -240,8 +285,9 @@ function abort(msg) {
 
 
 function parse_options(defaults) {
-    var args = [], _mainName = mainName()[0];
-    process.argv.forEach(function (item, i) {
+    var args = [],
+        _mainName = mainName()[0];
+    process.argv.forEach(function(item, i) {
         if (item === _mainName) {
             args = process.argv.slice(i + 1);
             return false;
@@ -309,7 +355,8 @@ function timestamp() {
  * @returns {*}
  */
 var format = function split(fmt) {
-    var parts = fmt.split('%'), len = parts.length;
+    var parts = fmt.split('%'),
+        len = parts.length;
     var res = parts[0];
     for (var x, i = 1, j = 1; i < len; i++) {
         x = parts[i][0];
@@ -350,25 +397,36 @@ module.exports = {
     version: VERSION,
     rules: rules,
     excludedHeaders: excludedHeaders,
+    cookieRequired: cookieRequired,
 
     apply: apply,
     allow: searchTrie,
     initialize: initialize,
     format: format,
 
-    config: function () {
+    config: function() {
         return config;
     },
 
-    contains: function (self, key) {
+    isString: function(str) {
+        return typeof str === typeof "";
+    },
+
+    contains: function(self, key) {
         return self && key && self.indexOf(key) > -1;
     },
 
-    startsWith: function (self, prefix) {
+    startsWith: function(self, prefix) {
         return prefix && self.length >= prefix.length && self.substring(0, prefix.length) === prefix;
     },
 
-    endsWith: function (self, suffix) {
+    endsWith: function(self, suffix) {
         return suffix && self.length >= suffix.length && self.slice(-suffix.length) === suffix;
+    },
+
+    getHostName: function(mixed) {
+        if (!mixed || !mixed['length']) return mixed;
+        var pos = mixed.indexOf(':');
+        return pos > 0 ? mixed.substr(0, pos) : mixed;
     }
 };

@@ -5,7 +5,7 @@
 
     "force_https": true,
 
-    "backend_https": false,
+    "backend_https": true,
 
     "server_header": "AirGoo",
 
@@ -20,6 +20,11 @@
     "prefer_lang": "zh-CN",
 
     "max_transmit_size": 10485760,
+
+    "target_google": {
+        "host": "www",
+        "domain": "google.com"
+    },
 
     "ext_domains": [
         ".google.com",
