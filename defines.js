@@ -11,81 +11,109 @@ var VERSION = (function() {
 })();
 
 var rules = {
-    html: [{
+    html: [
+        {
             "pathRegex": /\/(search|webhp)/,
             "pattern": /onmousedown="[^\"]+?"/g,
             "replacement": "target=\"_blank\""
-                // 非ajax或手机搜索时，rwt直接输出在html中
-        }, {
+            // 非ajax或手机搜索时，rwt直接输出在html中
+        }
+        ,{
             "pattern": /(?:http(?:s)?:)?\/\/(?=[-\w]+\.gstatic)/g,
             "replacement": "/!"
-                // gstatic
-        }, {
+            // gstatic
+        }
+        ,{
             "pattern": /(?:http(?:s)?:)?\/\/www\.google\.com/g,
             "replacement": ""
-                // W域下资源
-        }, {
+            // W域下资源
+        }
+        ,{
             "pattern": /(?:http(?:s)?:)?\/\/([-\w]+\.google\.com)/g,
             "replacement": "/!$1"
-                // 其它域资源
-        }, {
+            // 其它域资源
+        }
+        ,{
             "pattern": /pushdown_promo:/,
             "replacement": "_:"
-                // 顶部promo
+            // 顶部promo
         }
-        /*
-        {
+        ,{
             "pattern": /"\/\/"/g,
             "replacement": "\"/!\""
-            // dynamic load gstatic
-        },
-        {
+            // js-tag-part: dynamic load gstatic by string.join
+        }
+        /*
+        ,{
             "pattern": /google\.log=/,
             "replacement": "google.log=function(){};_log="
             // 去掉/gen_204
         }
         */
     ],
-    js: [{
+    js: [
+        {
             "pattern": /(?:http(?:s)?:)?\/\/www\.google\.com/g,
             "replacement": ""
-                // 重写主域资源绝对地址
-        },
+             // 重写主域资源绝对地址
+        }
         /*
-        {
+        ,{
             "pathRegex": /\/xjs/,
             "pattern": /window\.Image/g,
             "replacement": "Object"
-        },
-        {
+        }
+        ,{
             "pattern": /_\.mg=/,
             "replacement": "_.mg=function(){};_mg="
             // 禁用监听 gen_204
-        },
-        */
-        {
-            "pattern": /(?:http(?:s)?:)?\/\/(?=[-\w]+\.(?:google|gstatic))/g,
-            "replacement": "/!"
         }
+        */
+        ,{
+            "pathRegex": /\/rs=/,
+            "pattern": /\.src=(\w)\b/g,
+            "replacement": ".src=_DyRp($1)",
+            "insertHeader": 'window._DyRp=window._DyRp||function(a){if(typeof(a)==="string"){return a.replace(/^([htps:]+)?\\/\\//,"/!")}return a};'
+            // js context: new Image dynamic load
+        }
+        ,{
+            "pattern": /"(?:[htps:]+)?\/\/(?=[-.\w]+\.google)/g,
+            "replacement": '"/!'
+            // js context: literal string host
+        }
+        
     ],
-    json: [{
-        "pattern": /onmousedown\\\\x3d/g,
-        "replacement": "target\\\\x3d\\\\x22_blank\\\\x22 rwt\\\\x3d"
+    json: [
+        {
+            "pathRegex": /\/(search|webhp)/,
+            "pattern": /onmousedown\\\\x3d/g,
+            "replacement": "target\\\\x3d\\\\x22_blank\\\\x22 rwt\\\\x3d"
             // 废掉ajax rwt
-    }, {
-        "pattern": /\(\\\/\\\/(?=[-\w]+\.gstatic)/g,
-        "replacement": "(\/!"
-            // css url
-    }, {
-        "pattern": /(?:http(?:s)?:)?\\\/\\\/www\.google\.com/g,
-        "replacement": 1
-            // 搜索工具data-url中存在href正则匹配，只能用动态绝对地址
-    }, {
-        "pathRegex": /\/(search|webhp)/,
-        "pattern": /(?:http(?:s)?:)?\\\/\\\/(?=id\.google)/,
-        "replacement": "/!"
-            // json 可能含有 verify
-    }]
+        }
+        ,{
+            "pattern": /(\()?(\\\\x22)?\\\/\\\/(?=[-\w]+\.gstatic)/g,
+            "replacement": "$1$2\/!"
+            // css: image url
+        }
+        ,{
+            "pathRegex": /\/(search|webhp)/,
+            "pattern": /data-url((?:\\{4}x\w{2})+)(?:[htps:]+)?\\\/\\\/www\.google[.\w]+/,
+            "replacement": "data-url$1{origProto}://{origHost}"
+            // 搜索工具-清除data-url会用于正则匹配，只能用绝对地址
+        }
+        ,{
+            "pathRegex": /\/(search|webhp)/,
+            "pattern": /(?:http(?:s)?:)?\\\/\\\/(?=id\.google)/,
+            "replacement": "/!"
+            // js: /verify
+        }
+        ,{
+            "pathRegex": /\/(search|webhp)/,
+            "pattern": /(src(?:\\{2}x\w{2}){2})([htps:]+)?(?:\\\/){2}/,
+            "replacement": "$1/!"
+            // html: e.g. img src\\x3d\\x22https:\/\/encrypted.google.com\/finance\/chart
+        }
+    ]
 };
 
 

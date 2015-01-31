@@ -94,6 +94,7 @@ function buildRequest() {
     var sorryRedirect = (options.headers['cookie'] || '').match(/_abused=([-.\w]+)/);
     if (util.isArray(sorryRedirect)) {
         this._abused = options.hostname = sorryRedirect[1];
+        this._abusing = true;
     }
     return options;
 }
@@ -107,11 +108,12 @@ function isCookieRequired(req) {
     return false;
 }
 
-function cookRedirect(oldUrl, newHost) {
+function cookRedirect(oldUrl) {
     var newUrl = url.parse(oldUrl);
-    if (/ipv\d\.google.*\/IndexRedirect/.test(oldUrl)) {
+    if (/\.google.*\bIndexRedirect/.test(oldUrl)) {
         log(this.r1,'Google abuse inspection was detected.')
         this._abused = newUrl.hostname;
+        this._abusedNew = true;
     } else if (newUrl.hostname && newUrl.hostname !== TARGET.fullName) {
         newUrl.pathname = '/!' + newUrl.hostname + newUrl.pathname;
     }
@@ -139,7 +141,7 @@ function log() {
     }
     if (req) {
         address = (CONF.trust_proxy && req.headers['x-forwarded-for']) || req.connection.remoteAddress;
-        var comma = address.indexOf(',');
+        var comma = (address || '').indexOf(',');
         if (comma > 0) {
             address = address.substr(0, comma);
         }
@@ -167,7 +169,7 @@ var AirGooSession = function(r1, r4, args) {
             logs.unshift(r1);
             log.apply(null, logs);
         } else {
-            log(r1, logs || msg);
+            log(r1, logs + msg);
         }
     };
 
@@ -192,7 +194,7 @@ var AirGooSession = function(r1, r4, args) {
      */
     this.prepare = function(r3) {
         this.r3_content_length = parseInt(r3.headers['content-length'] || -1);
-        if (this.r3_content_length > CONF.max_transmit_size) {
+        if (CONF.max_transmit_size > 0 && this.r3_content_length > CONF.max_transmit_size) {
             throw new Error('Size exceeds');
         }
         this.r3_statusCode = r3.statusCode;
@@ -251,20 +253,17 @@ var AirGooSession = function(r1, r4, args) {
         if (CONF.server_header)
             this.r4_headers['server'] = CONF.server_header;
         if (this._abused) {
-            var srcCookie = this.r4_headers['set-cookie'];
-            if (!srcCookie) {
-                srcCookie = [];
-            } else if (defines.isString(srcCookie)) {
-                srcCookie = [srcCookie];
+            var setCookies = this.r4_headers['set-cookie'] || [];
+            if (defines.isString(setCookies)) {
+                setCookies = [setCookies];
             }
-            var strCookie = JSON.stringify(srcCookie),
-                _exempted = /GOOGLE_ABUSE_EXEMPTION=.*1990/.test(strCookie);
-            if (_exempted) {
-                srcCookie.push('_abused=; expires=Mon, 01-Jan-1990 00:00:00 GMT');
-            } else if (!defines.contains(strCookie, '_abused')) {
-                srcCookie.push(defines.format('_abused=%s; expires=%s', this._abused, new Date(Date.now() + 3e5).toGMTString()));
+            var _exempted = /=GOOGLE_ABUSE_EXEMPTION/.test(this.r4_headers['location']);
+            if (this._abusing && _exempted) {
+                setCookies.push('_abused=; expires=Mon, 01-Jan-1990 00:00:00 GMT');
+            } else if (this._abusedNew) {
+                setCookies.push(defines.format('_abused=%s; expires=%s', this._abused, new Date(Date.now() + 3e6).toGMTString()));
             }
-            this.r4_headers['set-cookie'] = srcCookie;
+            this.r4_headers['set-cookie'] = setCookies;
         }
         this.r4.writeHead(this.r3_statusCode, this.r4_headers);
     };
@@ -286,6 +285,7 @@ var AirGooSession = function(r1, r4, args) {
         }
         if (rules && content) {
             var str = content.toString(),
+                insertHeaders = [],
                 replacement;
             for (var rule, i = 0, len = rules.length; i < len; i++) {
                 rule = rules[i];
@@ -293,14 +293,22 @@ var AirGooSession = function(r1, r4, args) {
                     continue;
                 }
                 replacement = rule.replacement;
-                // if (typeof replacement === 'number')
-                // switch (replacement)
-                if (replacement === 1) {
-                    replacement = this.origProto + '://' + this.origHost;
+                if (replacement.indexOf('{') >= 0) {
+                    var self = this;
+                    replacement = replacement.replace(/\{(\w+)}/g, function(ma, g1){
+                        return self[g1] || ma;
+                    });
+                }
+                if (rule.insertHeader) {
+                    insertHeaders.push(rule.insertHeader);
                 }
                 str = str.replace(rule.pattern, replacement);
             }
-            return new Buffer(str);
+            if (insertHeaders.length) {
+                return new Buffer(insertHeaders.join('') + str);
+            } else {
+                return new Buffer(str);;
+            }
         }
         return content;
     };
@@ -340,7 +348,7 @@ var AirGooSession = function(r1, r4, args) {
             try {
                 that.prepare(r3);
             } catch (e) { // size
-                req.abort();
+                this.abort();
                 that.deny = true;
                 return abort(403, e.message || String(e), 'Denied : ' + that.path);
             }
@@ -432,7 +440,7 @@ var AirGooServer = function() {
     };
 
     this.preHandler = function(r1, r4) {
-        if (/^\/\w+_204/.test(r1.url)) {
+        if (/^\/(\w+_204|imghover)/.test(r1.url)) {
             r4.writeHead(204, {
                 'content-type': 'text/html; charset=UTF-8'
             });
