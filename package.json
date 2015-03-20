@@ -1,6 +1,6 @@
 {
 	"name" : "AirGoo",
-	"version" : "1.1.4",
+	"version" : "1.1.5",
 	"description" : "A shortcut to access Google service.",
 	"main" : "server.js",
 	"repository" : {

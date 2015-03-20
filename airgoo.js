@@ -259,9 +259,9 @@ var AirGooSession = function(r1, r4, args) {
             }
             var _exempted = /=GOOGLE_ABUSE_EXEMPTION/.test(this.r4_headers['location']);
             if (this._abusing && _exempted) {
-                setCookies.push('_abused=; expires=Mon, 01-Jan-1990 00:00:00 GMT');
+                setCookies.push('_abused=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT');
             } else if (this._abusedNew) {
-                setCookies.push(defines.format('_abused=%s; expires=%s', this._abused, new Date(Date.now() + 3e6).toGMTString()));
+                setCookies.push(defines.format('_abused=%s; path=/; expires=%s', this._abused, new Date(Date.now() + 3e6).toGMTString()));
             }
             this.r4_headers['set-cookie'] = setCookies;
         }
