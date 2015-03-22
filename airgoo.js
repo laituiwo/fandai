@@ -114,7 +114,7 @@ function cookRedirect(oldUrl) {
         log(this.r1,'Google abuse inspection was detected.')
         this._abused = newUrl.hostname;
         this._abusedNew = true;
-    } else if (defines.allow(newUrl.hostname) && newUrl.hostname && newUrl.hostname !== TARGET.fullName) {
+    } else if (newUrl.hostname && newUrl.hostname !== TARGET.fullName && defines.allow(newUrl.hostname)) {
         newUrl.pathname = '/!' + newUrl.hostname + newUrl.pathname;
     } else {
         return oldUrl;
